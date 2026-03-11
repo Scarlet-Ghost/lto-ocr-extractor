@@ -21,7 +21,7 @@ export default function UploadPage() {
         const res = await fetch("/api/extractions?limit=5");
         if (res.ok) {
           const data = await res.json();
-          setRecentExtractions(data.extractions ?? data ?? []);
+          setRecentExtractions(data.data ?? data.extractions ?? []);
         }
       } catch {
         // Silently fail — recent extractions are non-critical
