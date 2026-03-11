@@ -32,36 +32,46 @@ export default function UploadPage() {
     fetchRecent();
   }, []);
 
-  const handleFileSelected = useCallback(
-    async (file: File) => {
+  const handleFilesSelected = useCallback(
+    async (files: File[]) => {
       setIsProcessing(true);
       setError(null);
-      setStatusMessage("Uploading document...");
+      setStatusMessage(`Uploading ${files.length === 1 ? "document" : "documents"}...`);
 
       try {
-        // Step 1: Upload file
-        const formData = new FormData();
-        formData.append("file", file);
+        // Step 1: Upload all files
+        const uploadResults: { fileUrl: string; fileType: string }[] = [];
 
-        const uploadRes = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
+        for (const file of files) {
+          const formData = new FormData();
+          formData.append("file", file);
 
-        if (!uploadRes.ok) {
-          const uploadErr = await uploadRes.json().catch(() => ({}));
-          throw new Error(uploadErr.error ?? "Upload failed. Please try again.");
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            const uploadErr = await uploadRes.json().catch(() => ({}));
+            throw new Error(uploadErr.error ?? `Upload failed for ${file.name}.`);
+          }
+
+          uploadResults.push(await uploadRes.json());
         }
 
-        const { fileUrl, fileType } = await uploadRes.json();
+        // Step 2: Extract data from all documents at once
+        setStatusMessage("Extracting data from document(s)...");
 
-        // Step 2: Extract data via OCR
-        setStatusMessage("Extracting data from document...");
+        const fileUrls = uploadResults.map((r) => r.fileUrl);
 
         const extractRes = await fetch("/api/extract", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fileUrl }),
+          body: JSON.stringify(
+            fileUrls.length === 1
+              ? { fileUrl: fileUrls[0] }
+              : { fileUrls }
+          ),
         });
 
         if (!extractRes.ok) {
@@ -78,8 +88,8 @@ export default function UploadPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            original_file_url: fileUrl,
-            original_file_type: fileType ?? file.type,
+            original_file_url: JSON.stringify(uploadResults.map(r => r.fileUrl)),
+            original_file_type: uploadResults[0].fileType ?? files[0].type,
             ...extractionResult.extracted_data,
             confidence_scores: extractionResult.audit_flags?.field_confidence ?? {},
             audit_flags: extractionResult.audit_flags ?? {},
@@ -127,7 +137,7 @@ export default function UploadPage() {
 
       {/* Upload zone */}
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <UploadZone onFileSelected={handleFileSelected} isLoading={isProcessing} />
+        <UploadZone onFilesSelected={handleFilesSelected} isLoading={isProcessing} />
 
         {/* Status message */}
         {statusMessage && (

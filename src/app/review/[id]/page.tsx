@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AuditBanner from "@/components/audit-banner";
 import ExtractionForm from "@/components/extraction-form";
+import PdfImage from "@/components/pdf-image";
 import type {
   ExtractionRecord,
   ExtractionData,
@@ -57,6 +58,7 @@ export default function ReviewPage() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [previewUrls, setPreviewUrls] = useState<{ url: string; type: string }[]>([]);
 
   // Fetch extraction record on mount
   useEffect(() => {
@@ -74,6 +76,29 @@ export default function ReviewPage() {
         setFormData(extractFormData(data));
         if (data.pdf_url) {
           setPdfUrl(data.pdf_url);
+        }
+
+        // Parse file URLs — may be JSON array or single URL
+        if (data.original_file_url) {
+          let urls: string[] = [];
+          try {
+            const parsed = JSON.parse(data.original_file_url);
+            urls = Array.isArray(parsed) ? parsed : [data.original_file_url];
+          } catch {
+            urls = [data.original_file_url];
+          }
+
+          // Use proxy URLs to avoid CORS issues
+          const proxyResults: { url: string; type: string }[] = urls.map((fileUrl) => {
+            // Strip query parameters before detecting extension
+            // (signed URLs have ?token=... which breaks .split(".").pop())
+            const pathname = new URL(fileUrl, "http://localhost").pathname;
+            const ext = pathname.split(".").pop()?.toLowerCase() ?? "";
+            const type = ext === "pdf" ? "pdf" : "image";
+            const proxyUrl = `/api/storage/proxy?url=${encodeURIComponent(fileUrl)}`;
+            return { url: proxyUrl, type };
+          });
+          setPreviewUrls(proxyResults);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred.");
@@ -238,22 +263,34 @@ export default function ReviewPage() {
             Original Document
           </h2>
           <div className="flex items-center justify-center overflow-hidden rounded-md bg-gray-50">
-            {isImageType(record.original_file_type) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={record.original_file_url}
-                alt="Uploaded document"
-                className="max-h-[600px] w-full object-contain"
-              />
-            ) : isPdfType(record.original_file_type) ? (
-              <iframe
-                src={record.original_file_url}
-                title="Uploaded document"
-                className="h-[600px] w-full"
-              />
+            {previewUrls.length > 0 ? (
+              <div className="space-y-4">
+                {previewUrls.map((preview, i) => (
+                  <div key={i}>
+                    {previewUrls.length > 1 && (
+                      <p className="mb-1 text-xs font-medium text-gray-400">
+                        Document {i + 1}
+                      </p>
+                    )}
+                    {preview.type === "image" ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={preview.url}
+                        alt={`Document ${i + 1}`}
+                        className="w-full rounded-md object-contain"
+                      />
+                    ) : (
+                      <PdfImage
+                        url={preview.url}
+                        className="w-full"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="flex h-[300px] items-center justify-center text-sm text-gray-400">
-                Preview not available for this file type.
+                Loading preview...
               </div>
             )}
           </div>

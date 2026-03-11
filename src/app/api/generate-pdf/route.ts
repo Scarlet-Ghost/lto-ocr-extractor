@@ -79,12 +79,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get public URL for the generated PDF
-    const { data: urlData } = getSupabaseAdmin().storage
+    // Get signed URL for the generated PDF (bucket is private)
+    const { data: signedData, error: signedError } = await getSupabaseAdmin().storage
       .from("generated-pdfs")
-      .getPublicUrl(uploadData.path);
+      .createSignedUrl(uploadData.path, 86400); // 24 hour expiry
 
-    const pdfUrl = urlData.publicUrl;
+    if (signedError || !signedData?.signedUrl) {
+      console.error("Signed URL error:", signedError);
+      return NextResponse.json(
+        { error: "PDF generated but failed to create download URL." },
+        { status: 500 }
+      );
+    }
+
+    const pdfUrl = signedData.signedUrl;
 
     // If extractionId was provided, update the extraction record
     if (extractionId) {

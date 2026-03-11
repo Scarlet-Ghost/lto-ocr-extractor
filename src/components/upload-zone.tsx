@@ -7,62 +7,75 @@ const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 function validateFile(file: File): string | null {
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return "Invalid file type. Please upload a JPEG, PNG, or PDF.";
+    return `"${file.name}" — Invalid file type. Please upload JPEG, PNG, or PDF.`;
   }
   if (file.size > MAX_SIZE_BYTES) {
-    return "File exceeds 10 MB limit.";
+    return `"${file.name}" — File exceeds 10 MB limit.`;
   }
   return null;
 }
 
+interface FilePreview {
+  file: File;
+  url: string;
+  type: "image" | "pdf";
+  name: string;
+}
+
 interface UploadZoneProps {
-  onFileSelected: (file: File) => void;
+  onFilesSelected: (files: File[]) => void;
   isLoading?: boolean;
 }
 
 export default function UploadZone({
-  onFileSelected,
+  onFilesSelected,
   isLoading = false,
 }: UploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{
-    url: string;
-    type: string;
-    name: string;
-  } | null>(null);
+  const [previews, setPreviews] = useState<FilePreview[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = useCallback(
-    (file: File) => {
+  const processFiles = useCallback(
+    (fileList: FileList | File[]) => {
       setError(null);
-      const validationError = validateFile(file);
-      if (validationError) {
-        setError(validationError);
-        setPreview(null);
+      const files = Array.from(fileList);
+
+      if (files.length > 2) {
+        setError("Maximum 2 files allowed (one OR + one CR).");
         return;
       }
 
-      if (file.type.startsWith("image/")) {
-        const url = URL.createObjectURL(file);
-        setPreview({ url, type: "image", name: file.name });
-      } else {
-        setPreview({ url: "", type: "pdf", name: file.name });
+      // Validate all files
+      for (const file of files) {
+        const validationError = validateFile(file);
+        if (validationError) {
+          setError(validationError);
+          return;
+        }
       }
 
-      onFileSelected(file);
+      // Build previews
+      const newPreviews: FilePreview[] = files.map((file) => ({
+        file,
+        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
+        type: file.type.startsWith("image/") ? "image" : "pdf",
+        name: file.name,
+      }));
+
+      setPreviews(newPreviews);
+      onFilesSelected(files);
     },
-    [onFileSelected]
+    [onFilesSelected]
   );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragOver(false);
-      const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      processFiles(e.dataTransfer.files);
     },
-    [handleFile]
+    [processFiles]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -77,11 +90,18 @@ export default function UploadZone({
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) handleFile(file);
+      if (e.target.files && e.target.files.length > 0) {
+        processFiles(e.target.files);
+      }
     },
-    [handleFile]
+    [processFiles]
   );
+
+  const clearFiles = useCallback(() => {
+    setPreviews([]);
+    setError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }, []);
 
   return (
     <div className="relative">
@@ -108,73 +128,56 @@ export default function UploadZone({
                 fill="none"
                 viewBox="0 0 24 24"
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              <span className="text-sm font-medium text-primary">
-                Extracting...
-              </span>
+              <span className="text-sm font-medium text-primary">Processing...</span>
             </div>
           </div>
         )}
 
-        {/* Preview */}
-        {preview ? (
+        {/* Previews */}
+        {previews.length > 0 ? (
           <div className="flex flex-col items-center gap-3">
-            {preview.type === "image" ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview.url}
-                alt="Preview"
-                className="h-32 w-auto rounded-md object-contain shadow-sm"
-              />
-            ) : (
-              <div className="flex h-32 w-24 items-center justify-center rounded-md bg-red-100 text-red-600">
-                <svg
-                  className="h-12 w-12"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h4v2h-4v-2zm0 3h4v2h-4v-2zm-2-3h1v2H8v-2zm0 3h1v2H8v-2z" />
-                </svg>
-              </div>
-            )}
+            <div className="flex gap-4">
+              {previews.map((p, i) => (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  {p.type === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.url}
+                      alt={`Preview ${i + 1}`}
+                      className="h-24 w-auto rounded-md object-contain shadow-sm"
+                    />
+                  ) : (
+                    <div className="flex h-24 w-20 items-center justify-center rounded-md bg-red-100 text-red-600">
+                      <svg className="h-10 w-10" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6zm-1 2l5 5h-5V4zm-3 9h4v2h-4v-2zm0 3h4v2h-4v-2z" />
+                      </svg>
+                    </div>
+                  )}
+                  <p className="max-w-[150px] truncate text-xs text-gray-500">{p.name}</p>
+                </div>
+              ))}
+            </div>
             <p className="text-sm font-medium text-neutral-dark">
-              {preview.name}
+              {previews.length === 1 ? "1 file selected" : `${previews.length} files selected`}
             </p>
             <p className="text-xs text-gray-500">Click or drop to replace</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <svg
-              className="h-10 w-10 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h.1a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
+            <svg className="h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6h.1a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <p className="text-sm font-medium text-neutral-dark">
-              Drop OR/CR document here
+              Drop OR/CR document(s) here
             </p>
             <p className="text-xs text-gray-500">
-              JPEG, PNG, or PDF up to 10MB
+              Upload 1 combined file or 2 separate files (OR + CR)
+            </p>
+            <p className="text-xs text-gray-400">
+              JPEG, PNG, or PDF up to 10MB each
             </p>
           </div>
         )}
@@ -183,21 +186,33 @@ export default function UploadZone({
           ref={inputRef}
           type="file"
           accept=".jpg,.jpeg,.png,.pdf"
+          multiple
           onChange={handleInputChange}
           className="hidden"
         />
       </div>
 
-      {/* Browse button */}
-      {!preview && (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="mx-auto mt-3 block rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
-        >
-          Browse Files
-        </button>
-      )}
+      {/* Action buttons */}
+      <div className="mt-3 flex items-center justify-center gap-3">
+        {!previews.length && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+          >
+            Browse Files
+          </button>
+        )}
+        {previews.length > 0 && !isLoading && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); clearFiles(); }}
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50"
+          >
+            Clear
+          </button>
+        )}
+      </div>
 
       {/* Error message */}
       {error && <p className="mt-2 text-center text-sm text-red-600">{error}</p>}

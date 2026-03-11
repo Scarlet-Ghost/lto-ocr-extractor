@@ -2,50 +2,54 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { ExtractionData } from './types';
 
 /**
- * PDF Generator for Annex-C (COC) template.
+ * PDF Generator for Annex-C Stand-Alone Private Car Policy template.
  *
  * The Annex-C template is a scanned document (not a fillable form),
  * so we overlay text at specific coordinates using pdf-lib.
  *
  * Coordinate system: origin is bottom-left of the page.
- * Page size: US Letter (612 x 792 points).
+ * Actual page size: 608.4 x 928.56 points (8.45" x 12.90")
  *
- * NOTE: Coordinates are initial estimates based on the template layout
- * and will need fine-tuning during QA with real documents.
+ * Coordinates calibrated against the actual Annex-C template:
+ * - Page has header (company name area) at top
+ * - "STAND-ALONE PRIVATE CAR POLICY" title
+ * - Policy info block (policy no, name/address, dates)
+ * - Covered Vehicle table (2 rows)
+ * - Section I/II Third Party Liability with Limit of Liability
+ * - Premiums table
+ * - Terms and conditions text
  */
 
-// Field coordinate map — all positions in PDF points (bottom-left origin)
-const FIELD_POSITIONS = {
-  // Insured/Assured info (top-left box)
-  insured_name: { x: 42, y: 608, fontSize: 10, bold: true },
-  insured_address: { x: 42, y: 594, fontSize: 8, bold: false },
+// All coordinates measured from bottom-left of 608.4 x 928.56 page
+// Calibrated against grid overlay on 2026-03-11 (v3)
+const FIELDS = {
+  // Name and Address of Insured/Assured box (upper-middle of page)
+  // Data goes BELOW the header text, inside the box
+  insured_name:    { x: 38, y: 768, size: 9, bold: true },
+  insured_address: { x: 38, y: 756, size: 7.5, bold: false },
 
-  // Row 1 of Covered Vehicle table:
-  // MODEL | MAKE | TYPE OF BODY | COLOR | M.V. FILE NO.
-  model_series: { x: 42, y: 538, fontSize: 9, bold: false },
-  make: { x: 160, y: 538, fontSize: 9, bold: false },
-  type_of_body: { x: 280, y: 538, fontSize: 9, bold: false },
-  color: { x: 380, y: 538, fontSize: 9, bold: false },
-  mv_file_no: { x: 460, y: 538, fontSize: 9, bold: false },
+  // COVERED VEHICLE table — Row 1 (data below column headers)
+  // Layout: MODEL | MAKE | TYPE OF BODY | COLOR | M.V. FILE NO.
+  model_series:  { x: 38,  y: 696, size: 7, bold: false },
+  make:          { x: 190, y: 696, size: 7, bold: false },
+  type_of_body:  { x: 330, y: 696, size: 7, bold: false },
+  color:         { x: 450, y: 696, size: 7, bold: false },
+  mv_file_no:    { x: 520, y: 696, size: 6, bold: false },
 
-  // Row 2 of Covered Vehicle table:
-  // PLATE NO. | SERIAL/CHASSIS NO. | MOTOR NO. | AUTH. CAPACITY | UNLADEN WEIGHT
-  plate_no: { x: 42, y: 514, fontSize: 9, bold: false },
-  serial_chassis_no: { x: 160, y: 514, fontSize: 9, bold: false },
-  motor_no: { x: 310, y: 514, fontSize: 9, bold: false },
-  capacity: { x: 420, y: 514, fontSize: 9, bold: false },
-  unladen_weight: { x: 500, y: 514, fontSize: 9, bold: false },
+  // COVERED VEHICLE table — Row 2 (data below column headers)
+  // Layout: PLATE NO. | SERIAL/CHASSIS NO. | MOTOR NO. | AUTH. CAPACITY | UNLADEN WEIGHT
+  plate_no:          { x: 38,  y: 677, size: 7, bold: false },
+  serial_chassis_no: { x: 150, y: 677, size: 6, bold: false },
+  motor_no:          { x: 310, y: 677, size: 6, bold: false },
+  capacity:          { x: 455, y: 677, size: 7, bold: false },
+  unladen_weight:    { x: 525, y: 677, size: 6.5, bold: false },
 
-  // Limit of Liability
-  limit_of_liability: { x: 420, y: 480, fontSize: 10, bold: true },
+  // SECTION I/II — Limit of Liability (fixed P 100,000.00)
+  // Positioned over the blank line after "LIMIT OF LIABILITY  P"
+  limit_of_liability: { x: 458, y: 657, size: 9, bold: true },
 } as const;
 
-/**
- * Loads the blank Annex-C template from the public directory.
- * Supports both server-side (filesystem) and client-side (fetch) loading.
- */
 async function loadTemplate(): Promise<ArrayBuffer> {
-  // Server-side: read from filesystem
   if (typeof window === 'undefined') {
     const fs = await import('fs');
     const path = await import('path');
@@ -54,24 +58,19 @@ async function loadTemplate(): Promise<ArrayBuffer> {
     return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
   }
 
-  // Client-side: fetch from public URL
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
   const response = await fetch(`${baseUrl}/templates/annex-c-template.pdf`);
   if (!response.ok) {
-    throw new Error(`Failed to load Annex-C template: ${response.status} ${response.statusText}`);
+    throw new Error(`Failed to load Annex-C template: ${response.status}`);
   }
   return response.arrayBuffer();
 }
 
 /**
  * Generate a filled Annex-C PDF from extraction data.
- *
- * @param data - Extracted vehicle/insured data from OCR
- * @returns PDF as Uint8Array ready for download or storage
  */
 export async function generateAnnexCPdf(data: ExtractionData): Promise<Uint8Array> {
   const templateBytes = await loadTemplate();
-
   const pdfDoc = await PDFDocument.load(templateBytes);
   const pages = pdfDoc.getPages();
 
@@ -84,48 +83,47 @@ export async function generateAnnexCPdf(data: ExtractionData): Promise<Uint8Arra
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const textColor = rgb(0, 0, 0);
 
-  // Helper: draw text at a coordinate, skipping empty values
-  const drawField = (
-    text: string | undefined | null,
-    position: { x: number; y: number; fontSize: number; bold: boolean }
-  ) => {
+  const draw = (text: string | undefined | null, field: { x: number; y: number; size: number; bold: boolean }) => {
     if (!text) return;
     page.drawText(text, {
-      x: position.x,
-      y: position.y,
-      size: position.fontSize,
-      font: position.bold ? boldFont : font,
+      x: field.x,
+      y: field.y,
+      size: field.size,
+      font: field.bold ? boldFont : font,
       color: textColor,
     });
   };
 
-  // --- Fill all fields ---
-
   // Insured info
-  drawField(data.insured_name, FIELD_POSITIONS.insured_name);
-  drawField(data.insured_address, FIELD_POSITIONS.insured_address);
+  draw(data.insured_name, FIELDS.insured_name);
+
+  // Wrap long addresses
+  const address = data.insured_address || '';
+  if (address.length > 80) {
+    const mid = address.lastIndexOf(',', 80);
+    const breakPoint = mid > 40 ? mid + 1 : 80;
+    draw(address.slice(0, breakPoint).trim(), FIELDS.insured_address);
+    draw(address.slice(breakPoint).trim(), { ...FIELDS.insured_address, y: FIELDS.insured_address.y - 10 });
+  } else {
+    draw(address, FIELDS.insured_address);
+  }
 
   // Vehicle table row 1
-  drawField(data.model_series, FIELD_POSITIONS.model_series);
-  drawField(data.make, FIELD_POSITIONS.make);
-  drawField(data.type_of_body, FIELD_POSITIONS.type_of_body);
-  drawField(data.color, FIELD_POSITIONS.color);
-  drawField(data.mv_file_no, FIELD_POSITIONS.mv_file_no);
+  draw(data.model_series, FIELDS.model_series);
+  draw(data.make, FIELDS.make);
+  draw(data.type_of_body, FIELDS.type_of_body);
+  draw(data.color, FIELDS.color);
+  draw(data.mv_file_no, FIELDS.mv_file_no);
 
   // Vehicle table row 2
-  // Use plate_no if available, fall back to conduction_sticker
-  drawField(
-    data.plate_no || data.conduction_sticker || '',
-    FIELD_POSITIONS.plate_no
-  );
-  drawField(data.serial_chassis_no, FIELD_POSITIONS.serial_chassis_no);
-  drawField(data.motor_no, FIELD_POSITIONS.motor_no);
-  drawField(data.capacity, FIELD_POSITIONS.capacity);
-  drawField(data.unladen_weight, FIELD_POSITIONS.unladen_weight);
+  draw(data.plate_no || data.conduction_sticker || '', FIELDS.plate_no);
+  draw(data.serial_chassis_no, FIELDS.serial_chassis_no);
+  draw(data.motor_no, FIELDS.motor_no);
+  draw(data.capacity, FIELDS.capacity);
+  draw(data.unladen_weight, FIELDS.unladen_weight);
 
   // Fixed limit of liability
-  drawField('100,000.00', FIELD_POSITIONS.limit_of_liability);
+  draw('100,000.00', FIELDS.limit_of_liability);
 
-  const pdfBytes = await pdfDoc.save();
-  return pdfBytes;
+  return await pdfDoc.save();
 }
