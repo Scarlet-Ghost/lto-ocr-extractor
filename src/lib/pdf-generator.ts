@@ -21,32 +21,30 @@ import { ExtractionData } from './types';
  */
 
 // All coordinates measured from bottom-left of 608.4 x 928.56 page
-// Calibrated against grid overlay on 2026-03-11 (v3)
+// Calibrated against grid overlay + visual comparison on 2026-03-11 (v4)
 const FIELDS = {
   // Name and Address of Insured/Assured box (upper-middle of page)
-  // Data goes BELOW the header text, inside the box
   insured_name:    { x: 38, y: 768, size: 9, bold: true },
   insured_address: { x: 38, y: 756, size: 7.5, bold: false },
 
-  // COVERED VEHICLE table — Row 1 (data below column headers)
-  // Layout: MODEL | MAKE | TYPE OF BODY | COLOR | M.V. FILE NO.
-  model_series:  { x: 38,  y: 696, size: 7, bold: false },
-  make:          { x: 190, y: 696, size: 7, bold: false },
-  type_of_body:  { x: 330, y: 696, size: 7, bold: false },
-  color:         { x: 450, y: 696, size: 7, bold: false },
-  mv_file_no:    { x: 520, y: 696, size: 6, bold: false },
+  // COVERED VEHICLE table — Row 1 (data cells below column headers)
+  // Column boundaries: MODEL ~30-130 | MAKE ~130-260 | TYPE ~260-380 | COLOR ~380-480 | MVFILE ~480-580
+  model_series:  { x: 35,  y: 696, size: 7, bold: false },
+  make:          { x: 135, y: 696, size: 7, bold: false },
+  type_of_body:  { x: 265, y: 696, size: 7, bold: false },
+  color:         { x: 385, y: 696, size: 7, bold: false },
+  mv_file_no:    { x: 485, y: 696, size: 6, bold: false },
 
-  // COVERED VEHICLE table — Row 2 (data below column headers)
-  // Layout: PLATE NO. | SERIAL/CHASSIS NO. | MOTOR NO. | AUTH. CAPACITY | UNLADEN WEIGHT
-  plate_no:          { x: 38,  y: 677, size: 7, bold: false },
-  serial_chassis_no: { x: 150, y: 677, size: 6, bold: false },
-  motor_no:          { x: 310, y: 677, size: 6, bold: false },
-  capacity:          { x: 455, y: 677, size: 7, bold: false },
-  unladen_weight:    { x: 525, y: 677, size: 6.5, bold: false },
+  // COVERED VEHICLE table — Row 2
+  // Column boundaries: PLATE ~30-130 | CHASSIS ~130-265 | MOTOR ~265-400 | CAPACITY ~400-500 | WEIGHT ~500-580
+  plate_no:          { x: 35,  y: 677, size: 7, bold: false },
+  serial_chassis_no: { x: 135, y: 677, size: 6, bold: false },
+  motor_no:          { x: 268, y: 677, size: 6, bold: false },
+  capacity:          { x: 410, y: 677, size: 7, bold: false },
+  unladen_weight:    { x: 508, y: 677, size: 6.5, bold: false },
 
   // SECTION I/II — Limit of Liability (fixed P 100,000.00)
-  // Positioned over the blank line after "LIMIT OF LIABILITY  P"
-  limit_of_liability: { x: 458, y: 657, size: 9, bold: true },
+  limit_of_liability: { x: 435, y: 657, size: 9, bold: true },
 } as const;
 
 async function loadTemplate(): Promise<ArrayBuffer> {
