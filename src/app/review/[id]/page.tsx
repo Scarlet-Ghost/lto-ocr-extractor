@@ -59,6 +59,7 @@ export default function ReviewPage() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<{ url: string; type: string }[]>([]);
+  const [activeDoc, setActiveDoc] = useState(0);
 
   // Fetch extraction record on mount
   useEffect(() => {
@@ -257,36 +258,58 @@ export default function ReviewPage() {
 
       {/* Two-panel layout */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Left panel: Document preview */}
+        {/* Left panel: Document preview with carousel */}
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-500">
-            Original Document
-          </h2>
-          <div className="flex items-center justify-center overflow-hidden rounded-md bg-gray-50">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-500">
+              Original Document
+            </h2>
+            {previewUrls.length > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveDoc((prev) => Math.max(0, prev - 1))}
+                  disabled={activeDoc === 0}
+                  className="rounded-md border border-gray-300 p-1.5 text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-30"
+                  aria-label="Previous document"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-xs font-medium text-gray-500">
+                  {activeDoc + 1} / {previewUrls.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveDoc((prev) => Math.min(previewUrls.length - 1, prev + 1))}
+                  disabled={activeDoc === previewUrls.length - 1}
+                  className="rounded-md border border-gray-300 p-1.5 text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-30"
+                  aria-label="Next document"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="overflow-hidden rounded-md bg-gray-50">
             {previewUrls.length > 0 ? (
-              <div className="space-y-4">
-                {previewUrls.map((preview, i) => (
-                  <div key={i}>
-                    {previewUrls.length > 1 && (
-                      <p className="mb-1 text-xs font-medium text-gray-400">
-                        Document {i + 1}
-                      </p>
-                    )}
-                    {preview.type === "image" ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={preview.url}
-                        alt={`Document ${i + 1}`}
-                        className="w-full rounded-md object-contain"
-                      />
-                    ) : (
-                      <PdfImage
-                        url={preview.url}
-                        className="w-full"
-                      />
-                    )}
-                  </div>
-                ))}
+              <div>
+                {previewUrls[activeDoc].type === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={previewUrls[activeDoc].url}
+                    alt={`Document ${activeDoc + 1}`}
+                    className="w-full rounded-md object-contain"
+                  />
+                ) : (
+                  <PdfImage
+                    url={previewUrls[activeDoc].url}
+                    className="w-full"
+                  />
+                )}
               </div>
             ) : (
               <div className="flex h-[300px] items-center justify-center text-sm text-gray-400">
