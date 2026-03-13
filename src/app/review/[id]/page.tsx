@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import AuditBanner from "@/components/audit-banner";
 import ExtractionForm from "@/components/extraction-form";
+import ValuationForm from "@/components/valuation-form";
 import PdfImage from "@/components/pdf-image";
 import type {
   ExtractionRecord,
@@ -60,6 +61,7 @@ export default function ReviewPage() {
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [previewUrls, setPreviewUrls] = useState<{ url: string; type: string }[]>([]);
   const [activeDoc, setActiveDoc] = useState(0);
+  const [activeTab, setActiveTab] = useState<"extraction" | "valuation">("extraction");
 
   // Fetch extraction record on mount
   useEffect(() => {
@@ -319,18 +321,53 @@ export default function ReviewPage() {
           </div>
         </div>
 
-        {/* Right panel: Extraction form */}
+        {/* Right panel: Tabs */}
         <div>
-          <ExtractionForm
-            data={formData}
-            confidenceScores={confidenceScores}
-            onDataChange={handleDataChange}
-          />
+          {/* Tab navigation */}
+          <div className="mb-4 flex border-b border-gray-200">
+            <button
+              type="button"
+              onClick={() => setActiveTab("extraction")}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === "extraction"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Extracted Fields
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("valuation")}
+              className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === "valuation"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              Valuation & Quote
+            </button>
+          </div>
+
+          {/* Tab content */}
+          {activeTab === "extraction" ? (
+            <ExtractionForm
+              data={formData}
+              confidenceScores={confidenceScores}
+              onDataChange={handleDataChange}
+            />
+          ) : (
+            <ValuationForm
+              extractionData={formData}
+              extractionId={id}
+              onQuoteGenerated={(quoteId) => router.push(`/quote/${quoteId}/preview`)}
+            />
+          )}
         </div>
       </div>
 
-      {/* Bottom actions */}
-      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+      {/* Bottom actions (only show on extraction tab) */}
+      {activeTab === "extraction" && <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           {/* Generate PDF button */}
           <button
@@ -435,7 +472,7 @@ export default function ReviewPage() {
             PDF generated successfully.
           </p>
         )}
-      </div>
+      </div>}
     </main>
   );
 }
