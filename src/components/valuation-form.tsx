@@ -221,9 +221,8 @@ export default function ValuationForm({
         depreciation_years: breakdown.depreciationYears,
         depreciation_rate:
           breakdown.vehicleSrp > 0
-            ? ((breakdown.vehicleSrp - breakdown.fairMarketValue) /
-                breakdown.vehicleSrp) *
-              100
+            ? Math.round(((breakdown.vehicleSrp - breakdown.fairMarketValue) /
+                breakdown.vehicleSrp) * 10000) / 10000
             : 0,
         fair_market_value: breakdown.fairMarketValue,
         sum_insured: breakdown.sumInsured,
