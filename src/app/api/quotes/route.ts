@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error("Insert quote error:", error);
       return NextResponse.json(
-        { error: "Failed to create quote." },
+        { error: `Failed to create quote: ${error.message}` },
         { status: 500 }
       );
     }

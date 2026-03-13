@@ -258,7 +258,7 @@ export default function ValuationForm({
     } finally {
       setIsSubmitting(false);
     }
-  }, [breakdown, extractionData, onQuoteGenerated]);
+  }, [breakdown, extractionId, onQuoteGenerated]);
 
   // Computed display values
   const displayFmv =
