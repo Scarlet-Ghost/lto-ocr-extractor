@@ -32,6 +32,17 @@ function quoteRef(q: QuoteWithExtraction): string {
   return `VSO-${yy}${mm}-${seq}`;
 }
 
+function firstName(fullName: string | undefined | null): string {
+  if (!fullName) return "Sir/Madam";
+  const trimmed = fullName.trim().replace(/,+$/, "");
+  if (trimmed.includes(",")) {
+    const after = trimmed.split(",")[1]?.trim().split(" ")[0];
+    if (after) return after.charAt(0).toUpperCase() + after.slice(1).toLowerCase();
+  }
+  const first = trimmed.split(" ")[0];
+  return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "Sir/Madam";
+}
+
 function vehicleDesc(ext: QuoteWithExtraction["extractions"]): string {
   if (!ext) return "\u2014";
   const parts: string[] = [];
@@ -187,7 +198,7 @@ export default function CustomerQuotePage() {
             {ext?.insured_address && <p className="mb-5 text-[12.5px] text-gray-500">{ext.insured_address}</p>}
 
             <p className="mb-6">
-              Dear <span className="font-semibold">{ext?.insured_name?.split(" ")[0] || "Sir/Madam"}</span>,
+              Dear <span className="font-semibold">{firstName(ext?.insured_name)}</span>,
               <br />
               We are pleased to present the following motor insurance quotation for your review:
             </p>

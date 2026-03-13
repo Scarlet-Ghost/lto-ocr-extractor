@@ -39,6 +39,23 @@ function quoteRef(q: QuoteWithExtraction): string {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Helper: parse Filipino name (LASTNAME, FIRSTNAME → first name)     */
+/* ------------------------------------------------------------------ */
+function firstName(fullName: string | undefined | null): string {
+  if (!fullName) return "Sir/Madam";
+  // Filipino OCR names: "LASTNAME, FIRSTNAME MIDDLE" or "FIRSTNAME LASTNAME"
+  const trimmed = fullName.trim().replace(/,+$/, "");
+  if (trimmed.includes(",")) {
+    // "PALABRICA, ERNIE BRYAN" → "Ernie"
+    const after = trimmed.split(",")[1]?.trim().split(" ")[0];
+    if (after) return after.charAt(0).toUpperCase() + after.slice(1).toLowerCase();
+  }
+  // "ERNIE BRYAN PALABRICA" → "Ernie"
+  const first = trimmed.split(" ")[0];
+  return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : "Sir/Madam";
+}
+
+/* ------------------------------------------------------------------ */
 /*  Helper: build a vehicle description string                         */
 /* ------------------------------------------------------------------ */
 function vehicleDesc(ext: QuoteWithExtraction["extractions"]): string {
@@ -178,8 +195,19 @@ export default function QuotePreviewPage() {
         @media print {
           nav, .no-print { display: none !important; }
           body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .print-doc { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 40px 48px !important; }
+          .print-doc { box-shadow: none !important; border: none !important; margin: 0 !important; padding: 24px 36px !important; max-width: 100% !important; }
           .min-h-\\[calc\\(100vh-56px\\)\\] { min-height: auto !important; background: white !important; }
+          /* Keep two-column grid on print */
+          .print-grid { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 16px !important; }
+          /* Compact spacing for single page */
+          .print-compact { padding-top: 12px !important; padding-bottom: 12px !important; }
+          .print-compact-sm { padding-top: 8px !important; padding-bottom: 8px !important; margin-bottom: 12px !important; }
+          .print-text-sm { font-size: 11.5px !important; line-height: 1.4 !important; }
+          .print-mb-sm { margin-bottom: 12px !important; }
+          .print-hide { display: none !important; }
+          /* Smaller header on print */
+          .print-header-sm { padding-top: 16px !important; padding-bottom: 12px !important; }
+          .print-header-sm h1 { font-size: 24px !important; }
         }
       `}</style>
 
@@ -253,7 +281,7 @@ export default function QuotePreviewPage() {
           style={{ maxWidth: 780 }}
         >
           {/* ---- VSO Header ---- */}
-          <div className="border-b border-gray-200 px-10 pt-10 pb-6">
+          <div className="print-header-sm border-b border-gray-200 px-10 pt-10 pb-6">
             <div className="flex items-start justify-between">
               <div>
                 <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: "#1E40AF" }}>
@@ -296,7 +324,7 @@ export default function QuotePreviewPage() {
           </div>
 
           {/* ---- Body ---- */}
-          <div className="px-10 py-8 text-[13.5px] leading-relaxed text-gray-700">
+          <div className="print-compact print-text-sm px-10 py-8 text-[13.5px] leading-relaxed text-gray-700">
             {/* Addressed to */}
             <div className="mb-6">
               <p className="font-semibold text-gray-900">{ext?.insured_name || "\u2014"}</p>
@@ -306,7 +334,7 @@ export default function QuotePreviewPage() {
             </div>
 
             <p className="mb-6">
-              Dear <span className="font-semibold">{ext?.insured_name?.split(" ")[0] || "Sir/Madam"}</span>,
+              Dear <span className="font-semibold">{firstName(ext?.insured_name)}</span>,
             </p>
             <p className="mb-8">
               Thank you for your inquiry. We are pleased to submit our quotation for your vehicle
@@ -314,7 +342,7 @@ export default function QuotePreviewPage() {
             </p>
 
             {/* ---- Vehicle Card ---- */}
-            <div className="mb-8 rounded-lg border border-blue-100 bg-blue-50/50 p-5">
+            <div className="print-compact-sm mb-8 rounded-lg border border-blue-100 bg-blue-50/50 p-5">
               <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-blue-400">
                 Vehicle Details
               </h3>
@@ -337,7 +365,7 @@ export default function QuotePreviewPage() {
             </div>
 
             {/* ---- Two-Column: Coverage + Premium ---- */}
-            <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="print-grid print-mb-sm mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
               {/* LEFT: Coverage Limits */}
               <div className="rounded-lg border border-gray-200 p-5">
                 <h3 className="mb-4 text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -393,7 +421,7 @@ export default function QuotePreviewPage() {
             </div>
 
             {/* ---- Additional Details ---- */}
-            <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50 p-5">
+            <div className="print-compact-sm mb-8 rounded-lg border border-gray-200 bg-gray-50 p-5">
               <h3 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-gray-400">
                 Additional Details
               </h3>
