@@ -365,13 +365,12 @@ export default function DashboardPage() {
 
   // ---- Issue policy ----
   const handleIssue = async (id: string) => {
-    if (!confirm("Issue this policy? This action cannot be undone.")) return;
+    if (!window.confirm("Issue this policy? This action cannot be undone.")) return;
     setIssuingId(id);
     try {
-      const res = await fetch(`/api/quotes/${id}`, {
-        method: "PATCH",
+      const res = await fetch(`/api/quotes/${id}/issue`, {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "issued" }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
