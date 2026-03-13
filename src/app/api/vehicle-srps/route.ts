@@ -28,9 +28,18 @@ export async function GET(request: NextRequest) {
       query = query.ilike("model", `%${model}%`);
     }
     if (q) {
-      query = query.or(
-        `make.ilike.%${q}%,model.ilike.%${q}%,variant.ilike.%${q}%`
-      );
+      // Split query into words so "Honda CR-V" matches make=Honda AND model=CR-V
+      const words = q.trim().split(/\s+/);
+      if (words.length === 1) {
+        query = query.or(
+          `make.ilike.%${words[0]}%,model.ilike.%${words[0]}%,variant.ilike.%${words[0]}%`
+        );
+      } else {
+        // Multi-word: first word matches make, rest match model/variant
+        query = query.ilike("make", `%${words[0]}%`);
+        const rest = words.slice(1).join(" ");
+        query = query.or(`model.ilike.%${rest}%,variant.ilike.%${rest}%`);
+      }
     }
 
     query = query.limit(50);
